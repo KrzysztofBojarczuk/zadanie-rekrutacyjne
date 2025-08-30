@@ -6,9 +6,6 @@ namespace zadanie_rekrutacyjne.Service
 {
     public class CardActionService : ICardActionService
     {
-        private static readonly List<string> AllActions =
-             Enumerable.Range(1, 13).Select(i => $"Action{i}").ToList();
-
         public IEnumerable<string> GetAllowedActions(CardDetails card)
         {
             var allActions = new List<ActionRule>
@@ -30,14 +27,23 @@ namespace zadanie_rekrutacyjne.Service
                 new ActionRule("ACTION13", null, new[] { CardStatus.Ordered, CardStatus.Inactive, CardStatus.Active }, null)
             };
 
-            var allowedActions = allActions.Where(action =>
-            {
-                bool cardTypeMatches = !action.CardType.HasValue || action.CardType == card.CardType;
-                bool statusMatches = action.Statuses == null || action.Statuses.Contains(card.CardStatus);
-                bool pinMatches = !action.PinRequired.HasValue || action.PinRequired == card.IsPinSet;
-                return cardTypeMatches && statusMatches && pinMatches;
-            })
-            .Select(a => a.Action);
+            var allowedActions = allActions
+               .GroupBy(x => x.Action)
+               .Where(x =>
+               {
+                   var matchingRules = x.Where(rule =>
+                       (!rule.CardType.HasValue || rule.CardType == card.CardType) &&
+                       (rule.Statuses == null || rule.Statuses.Contains(card.CardStatus))
+                   ).ToList();
+
+                   if (matchingRules.Any(x => x.PinRequired == true) && !card.IsPinSet)
+                   {
+                       return false;
+                   }
+
+                   return matchingRules.Any(x => x.PinRequired == null || x.PinRequired == card.IsPinSet);
+               })
+               .Select(x => x.Key);
 
             return allowedActions;
         }
